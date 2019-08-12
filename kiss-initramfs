@@ -1,0 +1,107 @@
+#!/bin/sh -ef
+#
+# kiss-initramfs - A simple tool to create an initramfs.
+
+log() {
+    printf '\033[32m=>\033[m %s\n' "$@"
+}
+
+ramfs_clean() {
+    log "Cleaning up..."
+    rm -rf "/tmp/kiss-initramfs-$$"
+}
+
+create_directories() {
+    log "Creating directories..."
+
+    for dir in bin dev etc lib/modules lib64 mnt/root proc root sbin sys; do
+        mkdir -p "$tmp/$dir"
+    done
+}
+
+copy_busybox() {
+    log "Copying static busybox..."
+
+    cp -a /usr/lib/busybox "$tmp/bin/busybox"
+}
+
+create_init() {
+    log "Creating /init script..."
+
+    # NOTE: tabs are used to indent here.
+    cat <<-EOF > "$tmp/init"
+	#!/bin/busybox sh
+
+	# Mount the '/proc', '/sys' and '/dev' filesystems.
+	mount -t proc     none /proc
+	mount -t sysfs    none /sys
+	mount -t devtmpfs none /dev
+
+	# TODO: Loading drivers goes here.
+
+	# Mount the root filesystem.
+	mount -o ro /dev/sda1 /mnt/root
+
+	# Clean up.
+	umount /proc
+	umount /sys
+	umount /dev
+
+	# Swap to the real filesystem and boot it.
+	exec switch_root /mnt/root /sbin/init
+	EOF
+
+    chmod +x "$tmp/init"
+}
+
+load_modules() {
+    log "Copying over needed modules (if they exist)..."
+
+    [ -d "$mod" ] || return 0
+
+    find \
+        "$mod/crypto" \
+        "$mod/fs" \
+        "$mod/lib" \
+        "$mod/drivers/block" \
+        "$mod/drivers/ata" \
+        "$mod/drivers/md" \
+        "$mod/drivers/firewire" \
+        "$mod/drivers/scsi" \
+        "$mod/drivers/message" \
+        "$mod/drivers/pcmcia" \
+        "$mod/drivers/virtio" \
+        "$mod/drivers/usb/host" \
+        "$mod/drivers/usb/storage" \
+        -type f | cpio -dp "$tmp"
+
+    cp "/lib/modules/$kernel/modules.builtin" "$tmp/lib/modules"
+    cp "/lib/modules/$kernel/modules.order"   "$tmp/lib/modules"
+
+    depmod -b "$tmp" "$kernel"
+}
+
+create_img() {
+    log "Creating img file..."
+
+    (cd "$tmp"; find . | cpio -oH newc | gzip -9) \
+        > "/tmp/initramfs-$kernel.img"
+}
+
+main() {
+    kernel=$(uname -r)
+
+    tmp=/tmp/kiss-initramfs-$$
+    mod=/lib/modules/$kernel/kernel
+
+    # Clean up on exit and or error.
+    trap ramfs_clean EXIT INT
+
+    create_directories
+    copy_busybox
+    create_init
+    load_modules
+    create_img
+}
+
+main
