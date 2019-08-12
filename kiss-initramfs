@@ -8,6 +8,7 @@ log() {
 
 ramfs_clean() {
     log "Cleaning up..."
+
     rm -rf "/tmp/kiss-initramfs-$$"
 }
 
