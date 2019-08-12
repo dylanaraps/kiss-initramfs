@@ -3,17 +3,17 @@
 # kiss-initramfs - A simple tool to create an initramfs.
 
 log() {
-    printf '\033[32m=>\033[m %s\n' "$@"
+    printf '\033[32m=>\033[m %s...\n' "$@"
 }
 
 ramfs_clean() {
-    log "Cleaning up..."
+    log "Cleaning up"
 
     rm -rf "/tmp/kiss-initramfs-$$"
 }
 
 create_directories() {
-    log "Creating directories..."
+    log "Creating directories"
 
     for dir in bin dev etc lib/modules lib64 mnt/root proc root sbin sys; do
         mkdir -p "$tmp/$dir"
@@ -21,13 +21,13 @@ create_directories() {
 }
 
 copy_busybox() {
-    log "Copying static busybox..."
+    log "Copying static busybox"
 
     cp -a /usr/lib/busybox "$tmp/bin/busybox"
 }
 
 create_init() {
-    log "Creating /init script..."
+    log "Creating /init script"
 
     # NOTE: tabs are used to indent here.
     cat <<-EOF > "$tmp/init"
@@ -56,7 +56,7 @@ create_init() {
 }
 
 load_modules() {
-    log "Copying over needed modules (if they exist)..."
+    log "Copying over needed modules (if they exist)"
 
     [ -d "$mod" ] || return 0
 
@@ -83,7 +83,7 @@ load_modules() {
 }
 
 create_img() {
-    log "Creating img file..."
+    log "Creating img file"
 
     (cd "$tmp"; find . | cpio -oH newc | gzip -9) \
         > "/tmp/initramfs-$kernel.img"
