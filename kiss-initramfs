@@ -74,7 +74,7 @@ load_modules() {
         "$mod/drivers/virtio" \
         "$mod/drivers/usb/host" \
         "$mod/drivers/usb/storage" \
-        -type f | cpio -dp "$tmp"
+        -type f 2>/dev/null | cpio -dp "$tmp"
 
     cp "/lib/modules/$kernel/modules.builtin" "$tmp/lib/modules"
     cp "/lib/modules/$kernel/modules.order"   "$tmp/lib/modules"
