@@ -3,13 +3,13 @@
 # kiss-initramfs - A simple tool to create an initramfs.
 
 log() {
-    printf '\033[32m=>\033[m %s...\n' "$@"
+    printf '\033[32m=>\033[m %s.\n' "$@"
 }
 
 ramfs_clean() {
     log "Cleaning up"
 
-    rm -rf "/tmp/kiss-initramfs-$$"
+    rm -rf "$tmp"
 }
 
 create_directories() {
@@ -33,20 +33,27 @@ create_init() {
     cat <<-EOF > "$tmp/init"
 	#!/bin/busybox sh
 
-	# Mount the '/proc', '/sys' and '/dev' filesystems.
+	# Install all 'busybox' utilities.
+	busybox --install -s /bin
+
+	# Mount the '/dev/', '/proc' and '/sys' filesystems.
+	mount -t devtmpfs none /dev
 	mount -t proc     none /proc
 	mount -t sysfs    none /sys
-	mount -t devtmpfs none /dev
 
 	# TODO: Loading drivers goes here.
 
 	# Mount the root filesystem.
-	mount -o ro /dev/sda1 /mnt/root
+	# TODO: Parse '/proc/cmdline' for 'root='.
+	mount -o ro /dev/sda1 /mnt/root || {
+		sh -c 'echo "Something went wrong, dropping to emergency shell."'
+		exit 1
+    }
 
 	# Clean up.
+	umount /dev
 	umount /proc
 	umount /sys
-	umount /dev
 
 	# Swap to the real filesystem and boot it.
 	exec switch_root /mnt/root /sbin/init
@@ -86,10 +93,15 @@ create_img() {
     log "Creating img file"
 
     (cd "$tmp"; find . | cpio -oH newc | gzip -9) \
-        > "/tmp/initramfs-$kernel.img"
+        > "$tmp/../initramfs-$kernel.img"
 }
 
 main() {
+    [ "$(id -u)" = 0 ] || {
+        log "${0##*/}: needs to be run as root" >&2
+        exit 1
+    }
+
     kernel=$(uname -r)
 
     tmp=/tmp/kiss-initramfs-$$
