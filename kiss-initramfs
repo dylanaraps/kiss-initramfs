@@ -48,12 +48,14 @@ create_init() {
 	mount -o ro /dev/sda1 /mnt/root || {
 		sh -c 'echo "Something went wrong, dropping to emergency shell."'
 		exit 1
-    }
+	}
 
 	# Clean up.
 	umount /dev
 	umount /proc
 	umount /sys
+
+	echo "KISS INITRAMFS COMPLETE"
 
 	# Swap to the real filesystem and boot it.
 	exec switch_root /mnt/root /sbin/init
